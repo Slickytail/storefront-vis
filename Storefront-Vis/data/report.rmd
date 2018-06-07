@@ -1,0 +1,35 @@
+---
+title: "Survey Demographics Report"
+output: html_document
+params:
+  fltrd: NA
+  wwv: NA
+  var1: NA
+  var2: NA
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(weights)
+library(ggplot2)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r fig1, echo=FALSE, out.width="100%"}
+ggplot(data = params$fltrd)  +
+      geom_bar(aes_string(params$var1, fill=ifelse(params$var2 == "NONE", params$var1, params$var2), weight=params$wwv)) +
+      scale_fill_brewer(palette= "Spectral") + 
+      theme(axis.ticks.x=element_blank(),
+            axis.text.x=element_text(angle = -25, hjust = 0),
+            panel.grid.major.x = element_blank(),
+            panel.grid.major.y = element_line(color="gray", size=0.5),
+            panel.grid.minor.y = element_line(color="lightgray", size=0.25, lineend = "round"),
+            panel.background = element_blank())
+```
+
+```{r table, echo=FALSE}
+k<-round(100*wpct(params$fltrd[,params$var1], params$wwv), digits=2)
+j <- data.frame(opt=list(c(names(k), "Total"), val=c(k, sum(params$wwv))))
+names(j) <- c(params$var1, "Percent")
+kable(j, row.names = FALSE)
+```
