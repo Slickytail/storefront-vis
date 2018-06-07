@@ -45,7 +45,8 @@ server <- function(input, output) {
   })
   
   # Table Rendering ----
-  output$weighted <- renderTable({
+  output$weighted <- renderTable({dataTable()}, width='100%', height="auto")
+  dataTable <- reactive({
     ww <- if (input$noweight) rep(1, sum(inSample())) else processRake()[inSample()]
     s <- filter(survey, inSample()) %>%
       mutate(w = ww) %>%
@@ -101,10 +102,11 @@ server <- function(input, output) {
       rbind(list("Base", round(sum(sc$co), digits=0)), k)
       
     }
-  }, width='100%', height="auto")
+  })
   
   # Plot Rendering ----
-  output$weightedPlot <- renderPlot({
+  output$weightedPlot <- renderPlot({barPlot()})
+  barPlot <- reactive({
     ww <- if (input$noweight) rep(1, sum(inSample())) else processRake()[inSample()]
     s <- filter(survey, inSample()) %>%
       mutate(w = ww) %>%
@@ -167,13 +169,10 @@ server <- function(input, output) {
       tempReport <- file.path(tempdir(), "report.rmd")
       file.copy("data/report.rmd", tempReport, overwrite = TRUE)
       
-      flt <- filter(survey, inSample())
       # Set up parameters to pass to Rmd document
-      wwv <- if (input$noweight) rep(1, sum(inSample())) else processRake()[inSample()]
-      params <- list(fltrd = flt,
-                     wwv = wwv,
-                     var1 = input$variable,
-                     var2 = input$variable2
+
+      params <- list(plot = barPlot(),
+                     table = dataTable()
       )
       
       
