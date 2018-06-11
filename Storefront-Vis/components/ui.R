@@ -1,5 +1,8 @@
 library(shiny)
 
+# If the survey doesn't exist, let's return a blank UI with an error message
+if (exists("survey")) {
+
 # Output Options ----
 varsPanel <- tabPanel("Variables",
          h3("Data Output"),
@@ -151,3 +154,8 @@ ui <- fluidPage(
   )
   
 )
+} else {
+  stopApp()
+  ui <- fluidPage(h4("Error"), p("survey wasn't loaded at time of UI generation. Is the app being loaded properly?"))
+}
+

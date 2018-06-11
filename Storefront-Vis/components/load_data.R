@@ -1,6 +1,4 @@
 library(tidyverse)
-library(anesrake)
-library(weights)
 
 # Data Processing ----
 survey.filename <- "data/Survey+Location.csv"#file.choose()

@@ -45,3 +45,6 @@ rsconnect/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Local datasets
+*.csv
