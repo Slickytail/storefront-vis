@@ -6,7 +6,8 @@ if (exists("survey")) {
 # Output Options ----
 varsPanel <- tabPanel("Variables",
          h3("Data Output"),
-         selectInput("variable", "Variable to display",
+         # Dropdown to select primary variable
+         selectInput("variable", "X-axis variable",
                      list("Plans to Vote" = "GOTV",
                           "Political View" = "PoliticaView",
                           "View on Immigration" = "Immirgr",
@@ -14,6 +15,7 @@ varsPanel <- tabPanel("Variables",
                           "Governor choice" = "FIrstBallot",
                           "Social Media Use" = "Social",
                           "Television Use" = "WatchTV",
+                          # Passing named vectors allows us to create a section
                           `"Would you be likely to support a governor who supported this policy?"` = c(
                             "Universal preschool and Kindergarden" = "ChildEd",
                             "Improve state advocacy for dreamers" = "Dreamers",
@@ -46,7 +48,7 @@ varsPanel <- tabPanel("Variables",
                      )
          ),
          selectInput("variable2", "Second Variable",
-                     list(`Only display one variable` = c("None" = "NONE"),
+                     list(`Only display one variable` = c("None" = "NONE"),  # Dummy section to indicate that this is a different option
                           `Fill with another variable` = c(
                             "Plans to Vote" = "GOTV",
                             "Political View" = "PoliticaView",
@@ -87,15 +89,20 @@ varsPanel <- tabPanel("Variables",
                      )
          ),
          selectInput("distrib.mode", "Relative Distribution Mode",
-                     list("Real Distribution" = "real",
-                          "Relative to Subset" = "set",
-                          "Relative to entire sample" = "sample")),
+                     # Display distribution as it appears in the sample
+                     list("Real Distribution" = "real", 
+                          # Divide distributions of var2 | var1 by distribution of var2 in subset
+                          "Relative to Subset" = "set", 
+                          # Divide subset distribution of var1 or (var2 | var1) by distribution of var1 or var2 in the whole survey
+                          "Relative to entire sample" = "sample")), 
          downloadButton("report", "Generate report")
 )
 # Filters ----
 filterPanel <- tabPanel("Filters",
+         # Creation of subsets to exclude certain choices
          h3("Sample Filtering"),
          fluidRow(
+           # Two columns of checkboxes
            column(6, 
                   checkboxGroupInput("filter.race", "Subset Ethnicity", choices = levels(survey$Ethnic), selected=levels(survey$Ethnic)),
                   checkboxGroupInput("filter.education", "Subset Education", choices = levels(survey$Educ), selected=levels(survey$Educ)),
@@ -114,6 +121,7 @@ filterPanel <- tabPanel("Filters",
 )
 # Raking/weighting options ----
 weightPanel <- tabPanel("Weighting",
+         # Raking options, user probably doesn't want to mess with these
          h3("Weighting"),
          checkboxInput("noweight", "Disable weighting?"),
          conditionalPanel(condition = "!input.noweight",
@@ -126,6 +134,7 @@ weightPanel <- tabPanel("Weighting",
                                                             "Home Ownership" = "RakeOwn_Rent",
                                                             "Education" = "RakeEduc"), 
                                              selected = c("RakeParty","Gender", "Age_Bracket", "RakeEthnic", "RakeBorn", "RakeOwn_Rent", "RakeEduc")),
+                          # Anesrake weight cap for any row
                           sliderInput("cap", "Weight cap", min = 4, max = 20, value = 7)
           )
 )
@@ -137,6 +146,7 @@ ui <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(
+      # Panels we declared earlier
       tabsetPanel(
         varsPanel,
         filterPanel,
@@ -144,18 +154,26 @@ ui <- fluidPage(
     )),
     # Main Panel ----
     mainPanel(
+      # Either "Weighted distribution" or "Unweighted distribution"
       h3(textOutput("wheaders")),
+      # The main plot output
       plotOutput("weightedPlot", width = "100%", height="50vh"),
+      # Confusing table output
       tableOutput("weighted"),
+      # If the survey is weighted, display the general design effect
       conditionalPanel(condition = "!input.noweight",
-                       tags$div(title="Error of weighted results. Lower is better. 1 is No Error.", textOutput("effect")))
+                       # This creates a tooltip on hover that explains what general design effect is
+                       tags$div(title="Variance of weighted results. Lower is better. 1 is perfect.", textOutput("effect")))
       
     )
   )
   
 )
+
 } else {
+  # We can try stopping the app before it loads, but that can fail
   stopApp()
+  # Display an error. The server will check if inputs exist and stop it.
   ui <- fluidPage(h4("Error"), p("survey wasn't loaded at time of UI generation. Is the app being loaded properly?"))
 }
 
