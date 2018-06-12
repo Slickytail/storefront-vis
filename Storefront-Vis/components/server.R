@@ -8,39 +8,82 @@ library(ggplot2)
 library(scales)
 
 server <- function(input, output) {
-  # If any ui elements don't exist, stop the app and stop server execution
-  if (!exists("survey$targets")) {
+  # If the survey doesn't exist, exit the app
+  if (!exists("getAllResponses")) {
     stopApp()
-    # It's time to stop()
-    stop()
+    stop("App was started incorrectly")
   }
+  
+  # UI Generation ----
+  output$dropdowns <- renderUI({
+    vars <- colnames(select(survey(), everything(), -landed_at, -submitted_at))
+    tagList(
+      selectInput("variable", "X-Axis variable", as.list(vars)),
+      selectInput("variable2", "Y-Axis variable", list(`Single-Variable`=c("None"="NONE"), `Survey Vars`=vars))
+    )
+  })
+  output$filters <- renderUI({
+    
+  })
+  output$raking <- renderUI({
+    
+  })
+  
+  # Call typeform API ----
+  survey <- reactive({
+    invalidateLater(1000*60*10)
+    req(input$typeform.surveyCode)
+    req(input$typeform.authtoken)
+    typeform.request_url <- str_glue("http://api.typeform.com/forms/{input$typeform.surveyCode}/responses")
+    typeform.authorization <- str_glue("bearer {input$typeform.authtoken}")
+    form <- list("url"=typeform.request_url,
+                 "auth"=typeform.authorization)
+    if (nrow(.survey) == 0) {
+      d <- getAllResponses(form)
+      if (is.null(d))
+        return (NULL)
+      
+      .survey <- d
+    }
+    else {
+      lastSubmitted <- max(.survey$submitted_at)
+      .survey <- bind_rows(.survey, getAllResponses(form, since=lastSubmitted))
+    }
+    .survey
+    
+  })
   
   # Raking Call Reactive() ----
   processRake <- reactive({
-    # Make a list of targets
-    tvars <- targets[names(targets) %in% input$rakevars]
-    # Call anesrake and return the weight vector
-    anesrake(tvars, survey, caseid=survey$caseID, cap=input$cap)$weightvec
+    req(survey())
+    # # Make a list of targets
+    # tvars <- targets[names(targets) %in% input$rakevars]
+    # # Call anesrake and return the weight vector
+    # anesrake(tvars, survey, caseid=survey$caseID, cap=input$cap)$weightvec
+    return(rep(1, nrow(survey())))
+    
   })
   
   # Filter Reactive() ----
   inSample <- reactive({
-    k <- (survey$Ethnic %in% input$filter.race) &
-      (survey$Gender %in% input$filter.gender) &
-      (survey$Own_Rent %in% input$filter.own) &
-      (survey$Educ %in% input$filter.education) &
-      (survey$Party %in% input$filter.party) &
-      (survey$Age_Bracket %in% input$filter.age) &
-      (survey$Persuasion %in% input$filter.orientation) &
-      (survey$Region %in% input$filter.region) &
-      (!is.na(survey[[input$variable]]))  # Filter out na values in var1
-    # Filter out na values in var2
-    if (input$variable2 != "NONE")
-      k <- k&(!is.na(survey[[input$variable2]]))
-    k
+    req(survey())
+    # k <- (survey$Ethnic %in% input$filter.race) &
+    #   (survey$Gender %in% input$filter.gender) &
+    #   (survey$Own_Rent %in% input$filter.own) &
+    #   (survey$Educ %in% input$filter.education) &
+    #   (survey$Party %in% input$filter.party) &
+    #   (survey$Age_Bracket %in% input$filter.age) &
+    #   (survey$Persuasion %in% input$filter.orientation) &
+    #   (survey$Region %in% input$filter.region) &
+    #   (!is.na(survey[[input$variable]]))  # Filter out na values in var1
+    # # Filter out na values in var2
+    # if (input$variable2 != "NONE")
+    #   k <- k&(!is.na(survey[[input$variable2]]))
+    return(rep(T, nrow(survey())))
   })
   
   output$effect <- renderText({
+    req(survey())
     paste("General Design Effect:", round(generaldesigneffect(processRake()), digits=3))
   })
   
@@ -51,10 +94,11 @@ server <- function(input, output) {
   # Table Rendering ----
   output$weighted <- renderTable({dataTable()}, width='100%', height="auto")
   # This is a reactive so that we can pass it to the report
-  dataTable <- reactive({ 
+  dataTable <- reactive({
+    req(survey())
     ww <- if (input$noweight) rep(1, sum(inSample())) else processRake()[inSample()] # Get weights
     # Filter to subset and give default variable names
-    s <- filter(survey, inSample()) %>%
+    s <- filter(survey(), inSample()) %>%
       mutate(w = ww) %>%
       select(v=input$variable, w, v2=if (input$variable2 == "NONE" | input$variable2 == input$variable) NULL else input$variable2)
     # If we have a var2
@@ -71,11 +115,11 @@ server <- function(input, output) {
       vC <- sum(s$w)
       
       if (input$distrib.mode == "sample") {  # Distribution of var1 for survey
-        vD_F <- wpct(survey[[input$variable]], if (input$noweight) rep(1, nrow(survey)) else processRake())
-        vC_F <- sum(if (input$noweight) rep(1, nrow(survey)) else processRake())
+        vD_F <- wpct(survey()[[input$variable]], if (input$noweight) rep(1, nrow(survey())) else processRake())
+        vC_F <- sum(if (input$noweight) rep(1, nrow(survey())) else processRake())
       }
       if (input$distrib.mode == "set") {  # Distribution of var1 for subset
-        vD_F <- wpct(survey[[input$variable]][inSample()], if (input$noweight) rep(1, sum(inSample())) else processRake()[inSample()])
+        vD_F <- wpct(survey()[[input$variable]][inSample()], if (input$noweight) rep(1, sum(inSample())) else processRake()[inSample()])
         vC_F <- sum(if (input$noweight) rep(1, sum(inSample())) else processRake()[inSample()])
       }
       sc <- s %>%  # Start DPLYR chain
@@ -105,7 +149,7 @@ server <- function(input, output) {
         # ([Count for variable category within subset]/[Same count for whole survey]) * ([Number of survey rows]/[Number of subset rows])
         # = (n/N) * (S/s)
         # Counts across the entire survey
-        t <- wtd.table(survey[[input$variable]], weights=if (input$noweight) rep(1, nrow(survey)) else processRake()) # = N
+        t <- wtd.table(survey()[[input$variable]], weights=if (input$noweight) rep(1, nrow(survey())) else processRake()) # = N
         r <- setNames(t$sum.of.weights, t$x)  # Names are necessary for ease of comparing in-subset and entire-survey counts
         S_r <- sum(processRake()) / sum(processRake()[inSample()])  # = S/s
       }
@@ -123,6 +167,7 @@ server <- function(input, output) {
   # Plot Rendering ----
   output$weightedPlot <- renderPlot({barPlot()})
   barPlot <- reactive({
+    req(survey())
     if (input$variable2 != "NONE" && input$variable2 != input$variable) {  # 2-var versiom
       ggplot(data = barPlotData())  +  # Check data
         geom_bar(aes(x=v, y=co, fill=v2), stat="identity", position = "fill") +  # Draw bars

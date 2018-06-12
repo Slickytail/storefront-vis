@@ -1,6 +1,6 @@
 library(shiny)
 
-source("components/load_data.R")
+source("components/typeform.R")
 source("components/ui.R")
 source("components/server.R")
 

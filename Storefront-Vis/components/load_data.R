@@ -1,7 +1,7 @@
 library(tidyverse)
 
 # Data Processing ----
-survey.filename <- "data/Survey+Location.csv"#file.choose()
+survey.filename <- file.choose()
 survey <- read_csv(survey.filename) %>%
   filter(!(
     is.na(Party) | is.na(Gender) | is.na(Age_Bracket) | 
