@@ -23,6 +23,8 @@ library(stringr)
     # Make a list starting with time information
     # Discard each$metadata although we could keep it.
     l <- list("landed_at"=each$landed_at, "submitted_at"=each$submitted_at)
+    if (each$submitted_at == "0001-01-01T00:00:00Z")
+      next  # For the moment we don't care about people who clicked on but didn't take the survey
     for (answer in each$answers) {
       if (answer$field$type == "short_text" || answer$field$type == "long_text")  # These types of answers aren't useful for our data, and are likely to cause errors.
         next
@@ -47,12 +49,12 @@ getAllResponses <- function(form, since=NULL) {
     return("warning")})
   if (j == "warning")
     return(NULL)
-  p <- rjson::fromJSON(j)
+  p <- rjson::fromJSON(j)$page_count
   df <- .FlattenTypeform(j)
+  if (p < 2)
+    return (df)
   for (page in 2:p) {
     df <- bind_rows(df, .FlattenTypeform(form, .GetResponses(n=1000, since=since, page=page)))
   }
   df
 }
-
-.survey <- data.frame()

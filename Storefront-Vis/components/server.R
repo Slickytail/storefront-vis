@@ -6,23 +6,62 @@ library(weights)
 library(rmarkdown)
 library(ggplot2)
 library(scales)
+library(purrr)
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   # If the survey doesn't exist, exit the app
   if (!exists("getAllResponses")) {
     stopApp()
     stop("App was started incorrectly")
   }
   
+  f <- reactiveValues(l = list(), s=data.frame())
+  
   # UI Generation ----
   output$dropdowns <- renderUI({
-    vars <- colnames(select(survey(), everything(), -landed_at, -submitted_at))
-    tagList(
+    req(survey())
+    vars <- colnames(survey())
+    return(tagList(
       selectInput("variable", "X-Axis variable", as.list(vars)),
       selectInput("variable2", "Y-Axis variable", list(`Single-Variable`=c("None"="NONE"), `Survey Vars`=vars))
     )
+  )})
+  observeEvent(input$exttra, {
+    if (input$exttra != "NONE") {
+      print("Resetting exttra")
+      if (!input$exttra %in% isolate(f$l))
+        f$l <- append(isolate(f$l), input$exttra)
+      isolate(updateSelectInput(session, "exttra", selected="NONE"))
+    }
   })
+  
+  observe({
+    print("removing blanks")
+    f$l <- unique(f$l)
+    # Find "NONE" filters
+    f$l <- f$l[lapply(f$l, function(x, y) {y[[x]]}, input) != "NONE"]
+    
+    # Because we changed f$l, the filters will now render again, this time without the elements that are now NONE
+    
+  })
+
+
   output$filters <- renderUI({
+    req(survey())
+    o <- tagList()
+    print("Rendering filters")
+    nexttra <- selectInput("exttra", label="Add new filter", list(`Disable`=c("None"="NONE"), `Survey Vars`=colnames(survey())), selected="NONE")
+    # Update filters
+    if (is.null(input$exttra))
+      return(nexttra)
+    if (length(f$l)) {
+      for (fi in 1:length(f$l)) {
+
+        o <- tagList(o, selectInput(f$l[fi], label=NULL, list(`Disable`=c("None"="NONE"), `Survey Vars`=colnames(survey())), selected=f$l[fi]))
+      }
+    }
+    o <- tagList(o, nexttra)
+    o
     
   })
   output$raking <- renderUI({
@@ -30,7 +69,7 @@ server <- function(input, output) {
   })
   
   # Call typeform API ----
-  survey <- reactive({
+  observe({
     invalidateLater(1000*60*10)
     req(input$typeform.surveyCode)
     req(input$typeform.authtoken)
@@ -38,19 +77,35 @@ server <- function(input, output) {
     typeform.authorization <- str_glue("bearer {input$typeform.authtoken}")
     form <- list("url"=typeform.request_url,
                  "auth"=typeform.authorization)
-    if (nrow(.survey) == 0) {
+    
+    if (nrow(isolate(f$s)) == 0) {
       d <- getAllResponses(form)
       if (is.null(d))
-        return (NULL)
-      
-      .survey <- d
+        return()
+      if (nrow(d) == 0)
+        return()
+      f$s <- d
     }
     else {
-      lastSubmitted <- max(.survey$submitted_at)
-      .survey <- bind_rows(.survey, getAllResponses(form, since=lastSubmitted))
+      lastSubmitted <- max(isolate(f$s$submitted_at))
+      # The typeforms api returns timestamps like the following: 2018-06-12T21:07:40Z
+      # But in queries, it expects them in a different format:   2018-06-12T21:07:40
+      d <- getAllResponses(form, since=str_remove(lastSubmitted, "Z"))
+      if (is.null(d))
+        return ()
+      if (nrow(d) == 0)
+        return ()
+      if (nrow(d))
+        f$s <- bind_rows(isolate(f$s), d)
     }
-    .survey
-    
+  })
+  
+  survey <- reactive({
+    if (nrow(f$s)) {
+      j   <- select(f$s, everything(), -landed_at, -submitted_at)
+      j[] <- lapply(j, factor)
+      j
+    }
   })
   
   # Raking Call Reactive() ----
@@ -96,6 +151,8 @@ server <- function(input, output) {
   # This is a reactive so that we can pass it to the report
   dataTable <- reactive({
     req(survey())
+    req(input$variable)
+    req(input$variable2)
     ww <- if (input$noweight) rep(1, sum(inSample())) else processRake()[inSample()] # Get weights
     # Filter to subset and give default variable names
     s <- filter(survey(), inSample()) %>%
@@ -168,6 +225,8 @@ server <- function(input, output) {
   output$weightedPlot <- renderPlot({barPlot()})
   barPlot <- reactive({
     req(survey())
+    req(input$variable)
+    req(input$variable2)
     if (input$variable2 != "NONE" && input$variable2 != input$variable) {  # 2-var versiom
       ggplot(data = barPlotData())  +  # Check data
         geom_bar(aes(x=v, y=co, fill=v2), stat="identity", position = "fill") +  # Draw bars
@@ -196,12 +255,12 @@ server <- function(input, output) {
   # Plot is split into plot and data so that interactive plots can re-render without recomputing
   barPlotData <- reactive({
     ww <- if (input$noweight) rep(1, sum(inSample())) else processRake()[inSample()]  # Load weights
-    s <- filter(survey, inSample()) %>%  # DPLYR chain
+    s <- filter(survey(), inSample()) %>%  # DPLYR chain
       mutate(w = ww) %>%  # Add weights to frame
       select(v=input$variable, w, v2=if (input$variable2 == "NONE" | input$variable2 == input$variable) NULL else input$variable2)  # Generic names
     if (input$variable2 != "NONE" && input$variable2 != input$variable) {  # 2-var version
       r <- switch(input$distrib.mode, "set"=wtd.table(s$v2, ww),  # Relative Distribution table
-                  "sample" = wtd.table(survey[[input$variable2]], if (input$noweight) rep(1, nrow(survey)) else processRake()))
+                  "sample" = wtd.table(survey()[[input$variable2]], if (input$noweight) rep(1, nrow(survey())) else processRake()))
       r <- setNames(r$sum.of.weights, r$x)
        
       return (s %>%  # DPLYR chain
@@ -214,7 +273,7 @@ server <- function(input, output) {
     else {
       
       if (input$distrib.mode == "sample") { # If we have to do relative distribution
-        t <- wtd.table(survey[[input$variable]], weights=if (input$noweight) rep(1, nrow(survey)) else processRake())
+        t <- wtd.table(survey()[[input$variable]], weights=if (input$noweight) rep(1, nrow(survey())) else processRake())
         r <- setNames(t$sum.of.weights, t$x)
         S_r <- sum(processRake()) / sum(processRake()[inSample()])
       }

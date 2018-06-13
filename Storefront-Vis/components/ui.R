@@ -27,23 +27,6 @@ filterPanel <- tabPanel("Filters",
          # Creation of subsets to exclude certain choices
          h3("Sample Filtering"),
          uiOutput("filters")
-         # fluidRow(
-         #   # Two columns of checkboxes
-         #   column(6,
-         #          checkboxGroupInput("filter.race", "Subset Ethnicity", choices = levels(survey$Ethnic), selected=levels(survey$Ethnic)),
-         #          checkboxGroupInput("filter.education", "Subset Education", choices = levels(survey$Educ), selected=levels(survey$Educ)),
-         #          checkboxGroupInput("filter.gender", "Subset Gender", choices = levels(survey$Gender), selected=levels(survey$Gender)),
-         #          checkboxGroupInput("filter.region", "Subset Region", choices = levels(survey$Region), selected=levels(survey$Region))
-         #   ),
-         # 
-         #   column(6,
-         #          checkboxGroupInput("filter.party", "Subset Party", choices = levels(survey$Party), selected=levels(survey$Party)),
-         #          checkboxGroupInput("filter.age", "Subset Age Group", choices = levels(survey$Age_Bracket), selected=levels(survey$Age_Bracket)),
-         #          checkboxGroupInput("filter.own", "Subset Home Owners", choices = levels(survey$Own_Rent), selected=levels(survey$Own_Rent)),
-         #          checkboxGroupInput("filter.orientation", "Subset Sexual Orientation", choices = levels(survey$Persuasion), selected=levels(survey$Persuasion))
-         #   )
-         # 
-         # )
 )
 # Raking/weighting options ----
 weightPanel <- tabPanel("Weighting",
