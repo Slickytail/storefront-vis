@@ -29,7 +29,6 @@ server <- function(input, output, session) {
   )})
   observeEvent(input$exttra, {
     if (input$exttra != "NONE") {
-      print("Resetting exttra")
       id <- random_id()
       f$l <- append(f$l, id)
       isolate(updateSelectInput(session, "exttra", selected="NONE"))
@@ -38,7 +37,6 @@ server <- function(input, output, session) {
   })
   
   observe({
-    print("removing blanks")
     # Find "NONE" filters
     f$l <- f$l[!sapply(f$l, is.null)]
     j <- lapply(f$l, function(x, y) {y[[x]]}, input)
@@ -53,7 +51,6 @@ server <- function(input, output, session) {
     req(survey())
     req(f$l)
     o <- tagList()
-    print("Rendering filters")
     nexttra <- selectInput("exttra", label="Add new filter", list(`Disable`=c("None"="NONE"), `Survey Vars`=colnames(survey())), selected="NONE")
     # Update filters
     if (is.null(isolate(input$exttra)))
@@ -84,7 +81,7 @@ server <- function(input, output, session) {
   
   # Call typeform API ----
   observe({
-    invalidateLater(1000*60*10)
+    invalidateLater(1000*10*60)
     req(input$typeform.surveyCode)
     req(input$typeform.authtoken)
     typeform.request_url <- str_glue("http://api.typeform.com/forms/{input$typeform.surveyCode}/responses")
@@ -98,6 +95,7 @@ server <- function(input, output, session) {
         return()
       if (nrow(d) == 0)
         return()
+      print(paste("Got ", nrow(d), " responses"))
       f$s <- d
     }
     else {
@@ -107,10 +105,12 @@ server <- function(input, output, session) {
       d <- getAllResponses(form, since=str_remove(lastSubmitted, "Z"))
       if (is.null(d))
         return ()
-      if (nrow(d) == 0)
-        return ()
-      if (nrow(d))
+      if (nrow(d)) {
+        d <- filter(d, submitted_at != lastSubmitted)
+        print(paste("Got ", nrow(d), " new responses"))
         f$s <- bind_rows(isolate(f$s), d)
+      }
+      
     }
   })
   
