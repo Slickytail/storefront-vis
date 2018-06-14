@@ -270,8 +270,7 @@ server <- function(input, output, session) {
           panel.grid.major.x = element_blank(),  # No vertical lines bc bar plot
           panel.grid.major.y = element_line(color="gray", size=0.5),
           panel.grid.minor.y = element_line(color="lightgray", size=0.25, lineend = "round"),
-          panel.background = element_blank()) + # No grey background
-      scale_y_continuous(labels=percent)
+          panel.background = element_blank())# No grey background
   })
 
   barPlot <- reactive({
@@ -282,6 +281,7 @@ server <- function(input, output, session) {
     if (input$variable2 != "NONE" && input$variable2 != input$variable) {  # 2-var versiom
       .barPlotTheme() + 
         geom_bar(data = barPlotData(), aes(x=v, y=co, fill=v2), stat="identity", position = "fill") +  # Draw bars
+        scale_y_continuous(labels=percent) + 
         labs(x = input$variable, fill=input$variable2, y=switch(input$distrib.mode, "real"="Percent of choices", "sample"=,"set"="Ratio of X choice to all X choice"))
     } else { # 1-var version
       .barPlotTheme() + 
