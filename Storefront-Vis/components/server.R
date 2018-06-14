@@ -262,33 +262,30 @@ server <- function(input, output, session) {
   
   # Plot Rendering ----
   output$weightedPlot <- renderPlot({barPlot()})
+  .barPlotTheme <- reactive({
+    ggplot() +
+    scale_fill_brewer(palette= "Spectral") +  # Set Palette
+    theme(axis.ticks.x=element_blank(),  # No vertical ticks bc bar plot
+          axis.text.x=element_text(angle = -20, hjust = 0),  # Angle labels so they don't clip
+          panel.grid.major.x = element_blank(),  # No vertical lines bc bar plot
+          panel.grid.major.y = element_line(color="gray", size=0.5),
+          panel.grid.minor.y = element_line(color="lightgray", size=0.25, lineend = "round"),
+          panel.background = element_blank()) + # No grey background
+      scale_y_continuous(labels=percent)
+  })
+
   barPlot <- reactive({
     req(survey())
     req(inSample())
     req(input$variable)
     req(input$variable2)
     if (input$variable2 != "NONE" && input$variable2 != input$variable) {  # 2-var versiom
-      ggplot(data = barPlotData())  +  # Check data
-        geom_bar(aes(x=v, y=co, fill=v2), stat="identity", position = "fill") +  # Draw bars
-        scale_fill_brewer(palette= "Spectral") +  # Set Palette
-        theme(axis.ticks.x=element_blank(),  # No vertical ticks bc bar plot
-              axis.text.x=element_text(angle = -20, hjust = 0),  # Angle labels so they don't clip
-              panel.grid.major.x = element_blank(),  # No vertical lines bc bar plot
-              panel.grid.major.y = element_line(color="gray", size=0.5),
-              panel.grid.minor.y = element_line(color="lightgray", size=0.25, lineend = "round"),
-              panel.background = element_blank()) +  # No grey background
-        scale_y_continuous(labels=percent) + 
+      .barPlotTheme() + 
+        geom_bar(data = barPlotData(), aes(x=v, y=co, fill=v2), stat="identity", position = "fill") +  # Draw bars
         labs(x = input$variable, fill=input$variable2, y=switch(input$distrib.mode, "real"="Percent of choices", "sample"=,"set"="Ratio of X choice to all X choice"))
     } else { # 1-var version
-      ggplot(data = barPlotData())  +
-        geom_bar(aes(x=v, y=co, fill=v), stat="identity") +  # Color of bar is just visual now
-        scale_fill_brewer(palette= "Spectral") + 
-        theme(axis.ticks.x=element_blank(),
-              axis.text.x=element_text(angle = -20, hjust = 0),
-              panel.grid.major.x = element_blank(),
-              panel.grid.major.y = element_line(color="gray", size=0.5),
-              panel.grid.minor.y = element_line(color="lightgray", size=0.25, lineend = "round"),
-              panel.background = element_blank()) +
+      .barPlotTheme() + 
+        geom_bar(data = barPlotData(), aes(x=v, y=co, fill=v), stat="identity") +  # Color of bar is just visual now
         scale_y_continuous(labels=switch(input$distrib.mode, "sample"=percent, waiver())) +  # If we're in real mode we're showing counts not %s
         labs(x = input$variable, fill=input$variable, y=switch(input$distrib.mode, "sample"="Ratio of choice distribution in subset to distribution across full sample", "Number of responses"))
     }})
