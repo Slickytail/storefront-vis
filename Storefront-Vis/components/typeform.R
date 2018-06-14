@@ -3,10 +3,6 @@ library(httr)
 library(stringr)
 library(readr)
 
-# typeform.formid <- "abcdefg"
-# typeform.auth <- "1234567890abcxyzqwertyuiop"
-# typeform.request_url <- str_glue("http://api.typeform.com/forms/{typeform.formid}/responses")
-# typeform.authorization <- str_glue("bearer {typeform.auth}")
 
 .GetResponses <- function(form, n=100, since=NULL, page=NULL) {
   resp <- GET(form$url, add_headers(authorization = form$auth),
