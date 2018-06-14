@@ -59,3 +59,4 @@ getAllResponses <- function(form, since=NULL) {
   }
   df
 }
+.survey <- read_csv(file.choose())

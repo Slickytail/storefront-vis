@@ -48,6 +48,7 @@ server <- function(input, output, session) {
 
 
   output$filters <- renderUI({
+    print("rendering")
     req(survey())
     req(f$l)
     o <- tagList()
@@ -57,17 +58,19 @@ server <- function(input, output, session) {
       return(nexttra)
     if (length(f$l)) {
       for (fi in 1:length(f$l)) {
-        if (is.null(f$l[[fi]]) || f$l[[fi]]=="NONE") next;
+        if (is.null(f$l[[fi]]) || f$l[[fi]]=="NONE") next
         var <- input[[f$l[[fi]]]]
         dropdown <- selectInput(f$l[[fi]], label=NULL, list(`Disable`=c("None"="NONE"), `Survey Vars`=colnames(survey())), selected=var)
         o <- tagList(o, dropdown)
         if (!is.null(var)) {
-           options <- as.list(as.character(unique(survey()[[var]])))
-           sel <- isolate(input[[str_c(f$l[[fi]], "box")]])
-           if (is.null(sel) || !any(sel %in% options))
-             sel <- options
-           boxes <- checkboxGroupInput(str_c(f$l[[fi]], "box"), label=NULL, choices=options, selected=sel)
-           o <- tagList(o, boxes)
+          options <- lapply(as.list(as.character(unique(survey()[[var]]))), function(x) {if (is.na(x)) "NA" else x})
+          sel <- isolate(input[[str_c(f$l[[fi]], "box")]])
+          if (is.null(sel) || !any(sel %in% options))
+            sel <- options
+          print(sel)
+          print(options)
+          boxes <- checkboxGroupInput(str_c(f$l[[fi]], "box"), label=NULL, choices=options, selected=sel)
+          o <- tagList(o, boxes)
         }
       }
     }
@@ -115,6 +118,9 @@ server <- function(input, output, session) {
   })
   
   survey <- reactive({
+    j   <- .survey
+    j[] <- lapply(j, factor)
+    return(j)
     if (nrow(f$s)) {
       j   <- select(f$s, everything(), -landed_at, -submitted_at, -token)
       j[] <- lapply(j, factor)
@@ -136,19 +142,28 @@ server <- function(input, output, session) {
   # Filter Reactive() ----
   inSample <- reactive({
     req(survey())
-    # k <- (survey$Ethnic %in% input$filter.race) &
-    #   (survey$Gender %in% input$filter.gender) &
-    #   (survey$Own_Rent %in% input$filter.own) &
-    #   (survey$Educ %in% input$filter.education) &
-    #   (survey$Party %in% input$filter.party) &
-    #   (survey$Age_Bracket %in% input$filter.age) &
-    #   (survey$Persuasion %in% input$filter.orientation) &
-    #   (survey$Region %in% input$filter.region) &
-    #   (!is.na(survey[[input$variable]]))  # Filter out na values in var1
-    # # Filter out na values in var2
-    # if (input$variable2 != "NONE")
-    #   k <- k&(!is.na(survey[[input$variable2]]))
-    return(rep(T, nrow(survey())))
+    req(input$variable)
+    req(input$variable2)
+    k <- (!is.na(survey()[[input$variable]]))  # Filter out na values in var1
+    # Filter out na values in var2
+    if (input$variable2 != "NONE")
+      k <- k & (!is.na(survey()[[input$variable2]]))
+    
+    for (fil in f$l) {
+      if (is.null(fil)) return()
+      varName <- input[[fil]]
+      if (is.null(varName)) return()
+      allowed <- input[[str_c(fil,"box")]]
+      if (is.null(allowed)) return()
+      if ("NA" %in% allowed) {
+        t <- k & ( survey()[[varName]] %in% allowed | map_lgl(survey()[[varName]], is.na))
+      }
+      else
+        t <- k & (survey()[[varName]] %in% allowed)
+      if (!sum(t)) return()
+      k <- t
+    }
+    k
   })
   
   output$effect <- renderText({
@@ -165,6 +180,7 @@ server <- function(input, output, session) {
   # This is a reactive so that we can pass it to the report
   dataTable <- reactive({
     req(survey())
+    req(inSample())
     req(input$variable)
     req(input$variable2)
     ww <- if (input$noweight) rep(1, sum(inSample())) else processRake()[inSample()] # Get weights
@@ -212,7 +228,7 @@ server <- function(input, output, session) {
       h[-1:-2] <- round(v2D)  # Insert v2 counts and round 
       return(rbind(h, k))
     } 
-    # If no var1
+    # If no var2
     else {
       # Do we need to correct the subset to the entire survey?
       if (input$distrib.mode == "sample") {
@@ -239,6 +255,7 @@ server <- function(input, output, session) {
   output$weightedPlot <- renderPlot({barPlot()})
   barPlot <- reactive({
     req(survey())
+    req(inSample())
     req(input$variable)
     req(input$variable2)
     if (input$variable2 != "NONE" && input$variable2 != input$variable) {  # 2-var versiom
