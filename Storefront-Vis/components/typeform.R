@@ -23,7 +23,7 @@ library(readr)
   for (each in k$items) {
     # Make a list starting with time information
     # Discard each$metadata although we could keep it.
-    l <- list("landed_at"=each$landed_at, "submitted_at"=each$submitted_at)
+    l <- list("landed_at"=each$landed_at, "submitted_at"=each$submitted_at, "token"=each$token)
     if (each$submitted_at == "0001-01-01T00:00:00Z")
       next  # For the moment we don't care about people who clicked on but didn't take the survey
     for (answer in each$answers) {

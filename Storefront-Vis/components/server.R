@@ -106,7 +106,7 @@ server <- function(input, output, session) {
       if (is.null(d))
         return ()
       if (nrow(d)) {
-        d <- filter(d, submitted_at != lastSubmitted)
+        d <- filter(d, !(token %in% f$s$token))
         print(paste("Got ", nrow(d), " new responses"))
         f$s <- bind_rows(isolate(f$s), d)
       }
@@ -116,7 +116,7 @@ server <- function(input, output, session) {
   
   survey <- reactive({
     if (nrow(f$s)) {
-      j   <- select(f$s, everything(), -landed_at, -submitted_at)
+      j   <- select(f$s, everything(), -landed_at, -submitted_at, -token)
       j[] <- lapply(j, factor)
       j
     }
