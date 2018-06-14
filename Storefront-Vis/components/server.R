@@ -28,6 +28,7 @@ server <- function(input, output, session) {
     )
   )})
   observeEvent(input$exttra, {
+    cat(file=stderr(), "Re-setting Exttra dropdown\n")
     if (input$exttra != "NONE") {
       id <- random_id()
       f$l <- append(f$l, id)
@@ -37,19 +38,24 @@ server <- function(input, output, session) {
   })
   
   observe({
+    cat(file=stderr(), "Cleaning Filter List\n")
     # Find "NONE" filters
-    f$l <- f$l[!sapply(f$l, is.null)]
+    if (any(is.null(f$l)))
+      f$l <- f$l[!sapply(f$l, is.null)]
     j <- lapply(f$l, function(x, y) {y[[x]]}, input)
-    f$l <- f$l[j != "NONE"]
-    # Because we changed f$l, the filters will now render again, this time without the elements that are now NONE
+    if ("NONE" %in% j)
+      f$l <- f$l[j != "NONE"]
     # Remove duplicates
-    f$l <- f$l[!duplicated(j)]
+    if (any(duplicated(j)))
+      f$l <- f$l[!duplicated(j)]
+    
   })
 
 
   output$filters <- renderUI({
     req(survey())
     req(f$l)
+    cat(file=stderr(), "Rendering Filters\n")
     o <- tagList()
     nexttra <- selectInput("exttra", label="Add new filter", list(`Disable`=c("None"="NONE"), `Survey Vars`=colnames(survey())), selected="NONE")
     # Update filters
@@ -115,7 +121,6 @@ server <- function(input, output, session) {
   })
   
   survey <- reactive({
-
     if (nrow(f$s)) {
       j   <- select(f$s, everything(), -landed_at, -submitted_at, -token)
       j[] <- lapply(j, factor)
