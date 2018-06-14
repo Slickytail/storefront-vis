@@ -3,7 +3,7 @@ library(shiny)
 # If the survey doesn't exist, let's return a blank UI with an error message
 if (exists("getAllResponses")) {
 
-surveyInfo <- tabPanel("Connect to typeform",
+surveyInfo <- tabPanel("Connect to Typeform",
          h3("Typeform connect"),
          textInput("typeform.surveyCode", "ID of typeform survey"),
          textInput("typeform.authtoken", "Authorization token")

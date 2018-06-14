@@ -274,8 +274,6 @@ server <- function(input, output, session) {
   })
 
   barPlot <- reactive({
-    req(survey())
-    req(inSample())
     req(input$variable)
     req(input$variable2)
     if (input$variable2 != "NONE" && input$variable2 != input$variable) {  # 2-var versiom
@@ -291,6 +289,8 @@ server <- function(input, output, session) {
     }})
   # Plot is split into plot and data so that interactive plots can re-render without recomputing
   barPlotData <- reactive({
+    req(survey())
+    req(inSample())
     ww <- if (input$noweight) rep(1, sum(inSample())) else processRake()[inSample()]  # Load weights
     s <- filter(survey(), inSample()) %>%  # DPLYR chain
       mutate(w = ww) %>%  # Add weights to frame
