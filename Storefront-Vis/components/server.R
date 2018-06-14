@@ -7,6 +7,7 @@ library(rmarkdown)
 library(ggplot2)
 library(scales)
 library(purrr)
+library(ids)
 
 server <- function(input, output, session) {
   # If the survey doesn't exist, exit the app
@@ -29,35 +30,48 @@ server <- function(input, output, session) {
   observeEvent(input$exttra, {
     if (input$exttra != "NONE") {
       print("Resetting exttra")
-      if (!input$exttra %in% isolate(f$l))
-        f$l <- append(isolate(f$l), input$exttra)
+      id <- random_id()
+      f$l <- append(f$l, id)
       isolate(updateSelectInput(session, "exttra", selected="NONE"))
+      isolate(updateSelectInput(session, id, selected=input$exttra))
     }
   })
   
   observe({
     print("removing blanks")
-    f$l <- unique(f$l)
     # Find "NONE" filters
-    f$l <- f$l[lapply(f$l, function(x, y) {y[[x]]}, input) != "NONE"]
-    
+    f$l <- f$l[!sapply(f$l, is.null)]
+    j <- lapply(f$l, function(x, y) {y[[x]]}, input)
+    f$l <- f$l[j != "NONE"]
     # Because we changed f$l, the filters will now render again, this time without the elements that are now NONE
-    
+    # Remove duplicates
+    f$l <- f$l[!duplicated(j)]
   })
 
 
   output$filters <- renderUI({
     req(survey())
+    req(f$l)
     o <- tagList()
     print("Rendering filters")
     nexttra <- selectInput("exttra", label="Add new filter", list(`Disable`=c("None"="NONE"), `Survey Vars`=colnames(survey())), selected="NONE")
     # Update filters
-    if (is.null(input$exttra))
+    if (is.null(isolate(input$exttra)))
       return(nexttra)
     if (length(f$l)) {
       for (fi in 1:length(f$l)) {
-
-        o <- tagList(o, selectInput(f$l[fi], label=NULL, list(`Disable`=c("None"="NONE"), `Survey Vars`=colnames(survey())), selected=f$l[fi]))
+        if (is.null(f$l[[fi]]) || f$l[[fi]]=="NONE") next;
+        var <- input[[f$l[[fi]]]]
+        dropdown <- selectInput(f$l[[fi]], label=NULL, list(`Disable`=c("None"="NONE"), `Survey Vars`=colnames(survey())), selected=var)
+        o <- tagList(o, dropdown)
+        if (!is.null(var)) {
+           options <- as.list(as.character(unique(survey()[[var]])))
+           sel <- isolate(input[[str_c(f$l[[fi]], "box")]])
+           if (is.null(sel) || !any(sel %in% options))
+             sel <- options
+           boxes <- checkboxGroupInput(str_c(f$l[[fi]], "box"), label=NULL, choices=options, selected=sel)
+           o <- tagList(o, boxes)
+        }
       }
     }
     o <- tagList(o, nexttra)

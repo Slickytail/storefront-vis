@@ -1,6 +1,7 @@
 library(rjson)
 library(httr)
 library(stringr)
+library(readr)
 
 # typeform.formid <- "abcdefg"
 # typeform.auth <- "1234567890abcxyzqwertyuiop"
