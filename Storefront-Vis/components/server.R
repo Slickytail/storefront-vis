@@ -48,7 +48,6 @@ server <- function(input, output, session) {
 
 
   output$filters <- renderUI({
-    print("rendering")
     req(survey())
     req(f$l)
     o <- tagList()
@@ -67,8 +66,6 @@ server <- function(input, output, session) {
           sel <- isolate(input[[str_c(f$l[[fi]], "box")]])
           if (is.null(sel) || !any(sel %in% options))
             sel <- options
-          print(sel)
-          print(options)
           boxes <- checkboxGroupInput(str_c(f$l[[fi]], "box"), label=NULL, choices=options, selected=sel)
           o <- tagList(o, boxes)
         }
@@ -118,9 +115,7 @@ server <- function(input, output, session) {
   })
   
   survey <- reactive({
-    j   <- .survey
-    j[] <- lapply(j, factor)
-    return(j)
+
     if (nrow(f$s)) {
       j   <- select(f$s, everything(), -landed_at, -submitted_at, -token)
       j[] <- lapply(j, factor)
