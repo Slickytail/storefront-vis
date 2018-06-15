@@ -27,6 +27,7 @@ server <- function(input, output, session) {
       selectInput("variable2", "Y-Axis variable", list(`Single-Variable`=c("None"="NONE"), `Survey Vars`=vars))
     )
   )})
+  
   observeEvent(input$exttra, {
     cat(file=stderr(), "Re-setting Exttra dropdown\n")
     # After the user has selected a new filter
