@@ -28,7 +28,7 @@ The distribution mode switch allows you to view the relative distribution. This 
 
 #### Filtering
 The filtering tab allows creating filters to filter the survey to only respondents who selected particular options.
-To add a filter, change the "Add new filter" dropdown from None to whichever variable you'd like to filter. A set of checkboxes will appear. Unchecking one will filter out respondents who had given that answer. You can remove a filter by setting its dropdown back to None.<br/>
+To add a filter, select a variable from the dropdown and click the [+] button. A set of checkboxes will appear corresponding to the response values of that variable. Unchecking a box will remove everyone who selected the choice represented by that checkbox. To remove a filter click the [-] button next to its name. You do not have to re-enable all values before removing a filter; the filtered-out respondents will be added back to the set no matter the state of the filter at removal.
 Filtering is performed functionally, meaning that the original survey data is not modified and filters can be added and removed without side effects. At the moment there is no support for conditional filter logic. It is forbidden to create two filters on the same variable. 
 
 #### Raking
@@ -36,6 +36,6 @@ The raking tab allows providing real-world distributions of variables in order t
 Raking is **unimplemented** pending UX decisions.
 
 
-### Known Bugs
+### Known Issues
 
-* When changing a filter variable by changing its dropdown, if there are shared options between the old variable and the new one, the shared options will be the only ones selected rather than all options (as would occur if the new variable was added as a new filter).
+* Adding a filter causes the filtering() reactive to update twice, which wastes time.

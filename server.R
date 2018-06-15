@@ -16,7 +16,7 @@ server <- function(input, output, session) {
     stop("App was started incorrectly")
   }
   
-  f <- reactiveValues(l = list(), s=data.frame())
+  f <- reactiveValues(filter_ids=list(), filter_vals=list(), s=data.frame())
   
   # UI Generation ----
   output$dropdowns <- renderUI({
@@ -28,71 +28,42 @@ server <- function(input, output, session) {
     )
   )})
   
-  observeEvent(input$exttra, {
-    cat(file=stderr(), "Re-setting Exttra dropdown\n")
-    # After the user has selected a new filter
-    if (input$exttra != "NONE") {
-      id <- random_id()  # Generate a random ID for the new element
-      f$l <- append(f$l, id)  # Add it to the ID list
-      # Send a signal to set the value of the new ID to whatever was selected.
-      # Note that this won't be processed until after everything has reacted, so there will be a cycle when the input is created but has no value
-      updateSelectInput(session, id, selected=input$exttra)
-      updateSelectInput(session, "exttra", selected="NONE")  # Reset the new filter dropdown. 
+  observeEvent(input$addfilter, {
+    cat(file=stderr(), "Adding new dropdown\n")
+    if (input$newvar %in% f$filter_vals) {
+      cat(file=stderr(), "Canceled new dropdown because it would be a duplicate\n")
+      return()
     }
+    # After the user has clicked new
+    id <- random_id()  # Generate a random ID for the new element
+    f$filter_ids <- append(f$filter_ids, id)  # Add it to the ID list
+    f$filter_vals <- append(f$filter_vals, input$newvar)  # Add what variable it stores to the list
+    rmbutton <- actionButton(str_c(id, "rm"), label=NULL, icon=icon("minus"))  # Generate an action button
+    
+    observeEvent(input[[str_c(id, "rm")]], {  # Create an observer for this action button.
+      # First we need to remove the filter from internal data
+      ind <- which(f$filter_ids == id)
+      f$filter_vals <- f$filter_vals[-ind]
+      f$filter_ids <- f$filter_ids[-ind]
+      # Next we need to remove the actual UI elements
+      # Because we wrapped them in a div we can delete it easily
+      removeUI(str_c("#", id))
+    }, domain=session, once=TRUE)  # This observer should die after one run or after the page is closed.
+    
+    options <- lapply(as.character(unique(survey()[[input$newvar]])), function(x) {if (is.na(x)) "NA" else x})  # Get checkbox options
+    checks <- checkboxGroupInput(str_c(id, "box"), label=NULL, choices=options, selected=options)  # Create the checkboxes 
+    insertUI("#addfilterline", where="beforeBegin", ui=div(id=id, fluidRow(column(11, helpText(input$newvar)), column(1, rmbutton)), checks))  # Wrap the layout and insert it
   })
   
-  observe({ # This will depend on f$l and input[f$l]s
-    cat(file=stderr(), "Cleaning Filter List\n")
-    # Find any malformed filters and remove them
-    f$l <- f$l[!sapply(f$l, is.null)]
-    # Pull the selections of every filter dropdown
-    j <- lapply(f$l, function(x, y) {y[[x]]}, input)
-    f$l <- f$l[j != "NONE"]  # Remove any filters where the user has selected NONE
-    # Remove duplicates
-    f$l <- f$l[!duplicated(j)]
-  })
+  
 
-
-  output$filters <- renderUI({
-    req(survey())  # We have to know what columns are in the survey
-    req(f$l) # Update when exttra adds a new dropdown
-    cat(file=stderr(), "Rendering Filters\n")
-    o <- tagList() # Declare an empty tag list
-    nexttra <- selectInput("exttra", label="Add new filter", list(`Disable`=c("None"="NONE"), `Survey Vars`=colnames(survey())), selected="NONE")
-    # We don't want to take a dependency on input$exttra because then we have to render twice as often.
-    if (is.null(isolate(input$exttra)))  # But we do know that if it doesn't exist, the user can't have selected any dropdowns...
-      return(nexttra)  # In other words, this must be the first time we've rendered this session.
-    if (length(f$l)) {
-      for (fi in f$l) {
-        if (is.null(fi) || fi=="NONE") next  # If this item is about to be removed or if it's not set yet, don't try to draw it.
-        var <- input[[fi]]
-        dropdown <- selectInput(fi, label=NULL, list(`Disable`=c("None"="NONE"), `Survey Vars`=colnames(survey())), selected=var)  # Create an input
-        o <- tagList(o, dropdown)
-        if (!is.null(var)) {  # If we know the variable
-          # Get the list of unique values for filter options. If one is NA replace it with the string "NA"
-          options <- lapply(as.character(unique(survey()[[var]])), function(x) {if (is.na(x)) "NA" else x})
-          sel <- isolate(input[[str_c(fi, "box")]])  # Figure out which ones are currently selected
-          # The id scheme is <dropdown_id>box
-          if (is.null(sel) || !any(sel %in% options))  # If the input doesn't exist yet, or if nothing is selected, select everything
-            sel <- options
-          boxes <- checkboxGroupInput(str_c(fi, "box"), label=NULL, choices=options, selected=sel)  # Generate an input
-          o <- tagList(o, boxes)
-        }
-      }
-    }
-    o <- tagList(o, nexttra)
-    # Is it a problem that we've called tagList(tagList(tagList(tagList(tagList(tagList(...), ...), boxes), dropdown), boxes), nexttra)?
-    # Probably! But it's the only way I can find to make shiny render the dropdowns correctly. 
-    o
-    
-  })
   output$raking <- renderUI({
     
   })
   
   # Call typeform API ----
   observe({
-    invalidateLater(1000*10*60)
+    invalidateLater(1000*60*30)  # = 1000 ms/s * 60 s/m * 30 m
     req(input$typeform.surveyCode)
     req(input$typeform.authtoken)
     typeform.request_url <- str_glue("http://api.typeform.com/forms/{input$typeform.surveyCode}/responses")
@@ -129,6 +100,7 @@ server <- function(input, output, session) {
     if (nrow(f$s)) {
       j   <- select(f$s, everything(), -landed_at, -submitted_at, -token)
       j[] <- lapply(j, factor)
+      isolate(updateSelectInput(session, "newvar", choices=colnames(j)))  # Whenever the survey is updated it's a good time to update the filter var options
       j
     }
   })
@@ -149,29 +121,25 @@ server <- function(input, output, session) {
     req(survey())
     req(input$variable)
     req(input$variable2)
+    print("filtering")
     # Start by setting up a logical vector in the same length as the survey
     k <- (!is.na(survey()[[input$variable]]))  # Filter out na values in var1
     # Filter out na values in var2
     if (input$variable2 != "NONE")
       k <- k & (!is.na(survey()[[input$variable2]]))
-    
-    for (fil in f$l) {  # For each filter
-      # I think it's faster to use `return()` instead of `next`
-      # because if we return null then the graph will stay blanked until inSample() is truthy
-      # and then it'll have to draw again when we finish.
-      # This way, the graph will blank while we compute and then draw again
-      if (is.null(fil)) return() # The filter can be null if it was just deleted
-      varName <- input[[fil]]
-      if (is.null(varName) || varName == "NONE") return()  # The varname can be null if the filter was just created and the input hasn't been updated yet
-      allowed <- input[[str_c(fil,"box")]]
-      if (is.null(allowed)) return()  # The allowed values can be null if the checkBoxGroup hasn't been created yet.
-      if ("NA" %in% allowed) {
-        t <- k & ( survey()[[varName]] %in% allowed | map_lgl(survey()[[varName]], is.na))
+    if (length(f$filter_ids)) {
+      for (il in 1:length(f$filter_ids)) {  # For each filter
+        varName <- f$filter_vals[[il]]
+        fil <- f$filter_ids[[il]]
+        allowed <- input[[str_c(fil,"box")]]
+        if ("NA" %in% allowed) {
+          t <- k & ( survey()[[varName]] %in% allowed | map_lgl(survey()[[varName]], is.na))
+        }
+        else
+          t <- k & (survey()[[varName]] %in% allowed)
+        if (!sum(t)) return()  # If nothing is selected, it's more obvious to the user to not display a graph or table than to just skip this filter
+        k <- t
       }
-      else
-        t <- k & (survey()[[varName]] %in% allowed)
-      if (!sum(t)) return()  # If nothing is selected, it's more obvious to the user to not display a graph or table than to just skip this filter
-      k <- t
     }
     k
   })

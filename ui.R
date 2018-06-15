@@ -26,7 +26,10 @@ varsPanel <- tabPanel("Variables",
 filterPanel <- tabPanel("Filters",
          # Creation of subsets to exclude certain choices
          h3("Sample Filtering"),
-         uiOutput("filters")
+         ## Filters
+         div(id="addfilterline",
+          fluidRow(column(11, selectInput("newvar", NULL, NULL)), column(1, actionButton("addfilter", label=NULL, icon=icon("plus"))))
+         )
 )
 # Raking/weighting options ----
 weightPanel <- tabPanel("Weighting",
