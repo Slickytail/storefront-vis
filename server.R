@@ -4,9 +4,7 @@ library(shiny)
 library(anesrake)
 library(weights)
 library(rmarkdown)
-library(ggplot2)
 library(scales)
-library(purrr)
 library(ids)
 
 server <- function(input, output, session) {
@@ -29,7 +27,6 @@ server <- function(input, output, session) {
   )})
   
   observeEvent(input$addfilter, {
-    cat(file=stderr(), "Adding new dropdown\n")
     if (input$newvar %in% f$filter_vals) {
       cat(file=stderr(), "Canceled new dropdown because it would be a duplicate\n")
       return()
@@ -71,14 +68,16 @@ server <- function(input, output, session) {
     form <- list("url"=typeform.request_url,
                  "auth"=typeform.authorization)
     
-    if (nrow(isolate(f$s)) == 0) {
-      d <- getAllResponses(form)
+    if (nrow(isolate(f$s)) == 0) {  # Don't depend on f$s
+      d <- getAllResponses(form)  # This is the first run. We get everything
       if (is.null(d))
         return()
       if (nrow(d) == 0)
         return()
-      print(paste("Got ", nrow(d), " responses"))
+      cat(file=stderr(), paste("Got ", nrow(d), " responses\n"))
       f$s <- d
+      shinyjs::disable("typeform.surveyCode")  # Disable the shiny connection input to prevent surveys from being loaded on top of each other
+      shinyjs::disable("typeform.authtoken")
     }
     else {
       lastSubmitted <- max(isolate(f$s$submitted_at))
@@ -89,8 +88,8 @@ server <- function(input, output, session) {
         return ()
       if (nrow(d)) {
         d <- filter(d, !(token %in% f$s$token))
-        print(paste("Got ", nrow(d), " new responses"))
-        f$s <- bind_rows(isolate(f$s), d)
+        cat(file=stderr(), paste("Got ", nrow(d), " new responses\n"))
+        f$s <- bind_rows(isolate(f$s), d)  # Join the survey to the file
       }
       
     }
@@ -121,7 +120,6 @@ server <- function(input, output, session) {
     req(survey())
     req(input$variable)
     req(input$variable2)
-    print("filtering")
     # Start by setting up a logical vector in the same length as the survey
     k <- (!is.na(survey()[[input$variable]]))  # Filter out na values in var1
     # Filter out na values in var2
@@ -253,7 +251,7 @@ server <- function(input, output, session) {
     } else { # 1-var version
       .barPlotTheme() + 
         geom_bar(data = barPlotData(), aes(x=v, y=co, fill=v), stat="identity") +  # Color of bar is just visual now
-        scale_y_continuous(labels=switch(input$distrib.mode, "sample"=percent, waiver())) +  # If we're in real mode we're showing counts not %s
+        scale_y_continuous(labels=switch(input$distrib.mode, "sample"=percent, function(x) {paste0(round(x))})) +  # If we're in real mode we're showing counts not %s
         labs(x = input$variable, fill=input$variable, y=switch(input$distrib.mode, "sample"="Ratio of choice distribution in subset to distribution across full sample", "Number of responses"))
     }})
   # Plot is split into plot and data so that interactive plots can re-render without recomputing

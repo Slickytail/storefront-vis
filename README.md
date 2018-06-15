@@ -5,13 +5,14 @@
 * R
 * R Packages:
 	* shiny
-	* tidyverse (dplyr, ggplot2, readr, purrr)
+	* shinyjs
+	* rmarkdown
+	* tidyverse
+	* scales
+	* RColorBrewer
 	* stringr
 	* anesrake
 	* weights
-	* rmarkdown
-	* scales
-	* RColorBrewer
 	* ids
 
 

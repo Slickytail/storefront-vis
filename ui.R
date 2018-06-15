@@ -3,8 +3,8 @@ library(shiny)
 # If the survey doesn't exist, let's return a blank UI with an error message
 if (exists("getAllResponses")) {
 
-surveyInfo <- tabPanel("Connect to Typeform",
-         h3("Typeform connect"),
+surveyInfo <- tabPanel("Typeform Connection",
+         h3("Typeform Connection Tokens"),
          textInput("typeform.surveyCode", "ID of typeform survey"),
          textInput("typeform.authtoken", "Authorization token")
           )
@@ -55,6 +55,7 @@ weightPanel <- tabPanel("Weighting",
 
 # fluidPage call ----
 ui <- fluidPage(
+  shinyjs::useShinyjs(),
   titlePanel("CA Opinion Demographics"),
   
   sidebarLayout(
